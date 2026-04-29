@@ -11,6 +11,12 @@ cd codex-auth-switcher
 go install ./cmd/codex-switch
 ```
 
+Or use the project target:
+
+```bash
+make install
+```
+
 Or run without installing:
 
 ```bash
@@ -68,7 +74,9 @@ rejected to avoid accidentally making two profiles point at the same login.
 
 ```bash
 codex-switch status
+codex-switch status --json
 codex-switch capture
+codex-switch doctor
 codex-switch list
 codex-switch current
 codex-switch rename main personal
@@ -77,6 +85,21 @@ codex-switch delete backup
 
 `capture` reads live usage from `codex app-server`. It does not use stale
 session jsonl snapshots as a fallback.
+
+`status --json` prints machine-readable profile and usage state without tokens
+or raw auth data.
+
+`doctor` checks local profile files, duplicate identities, active profile
+matching, and live app-server usage for the active account. It exits non-zero
+when a failure is found.
+
+## Development
+
+```bash
+make test
+make check
+make status-demo
+```
 
 ## Storage
 
