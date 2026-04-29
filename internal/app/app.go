@@ -232,7 +232,7 @@ func printStatus(stdout io.Writer, st store.Store) error {
 			fmt.Fprintf(stdout, "%s %-16s %-28s usage unknown\n", marker, acct.Name, email)
 			continue
 		}
-		fmt.Fprintf(stdout, "%s %-16s %-28s 5h %3d%% left reset %-18s weekly %3d%% left reset %-18s %s\n",
+		fmt.Fprintf(stdout, "%s %-16s %-28s 5h %3d%% left reset %-31s weekly %3d%% left reset %-31s %s\n",
 			marker,
 			acct.Name,
 			email,
@@ -250,7 +250,27 @@ func formatReset(ts *int64) string {
 	if ts == nil {
 		return "unknown"
 	}
-	return time.Unix(*ts, 0).Format("02 Jan 15:04")
+	reset := time.Unix(*ts, 0)
+	return reset.Format("02 Jan 15:04") + " (" + formatDurationUntil(reset, time.Now()) + ")"
+}
+
+func formatDurationUntil(target, now time.Time) string {
+	remaining := target.Sub(now).Round(time.Minute)
+	if remaining <= 0 {
+		return "now"
+	}
+	minutes := int(remaining.Minutes())
+	if minutes < 60 {
+		return fmt.Sprintf("%dm left", minutes)
+	}
+	hours := minutes / 60
+	minutes = minutes % 60
+	if hours < 24 {
+		return fmt.Sprintf("%dh%dm left", hours, minutes)
+	}
+	days := hours / 24
+	hours = hours % 24
+	return fmt.Sprintf("%dd%dh left", days, hours)
 }
 
 func staleLabel(record usage.Record) string {
