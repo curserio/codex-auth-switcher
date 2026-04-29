@@ -5,12 +5,6 @@ import (
 	"time"
 )
 
-func TestFormatReset(t *testing.T) {
-	if got := formatReset(nil); got != "unknown" {
-		t.Fatalf("formatReset(nil) = %q, want unknown", got)
-	}
-}
-
 func TestFormatDurationUntil(t *testing.T) {
 	now := time.Date(2026, 4, 29, 12, 0, 0, 0, time.UTC)
 	tests := []struct {

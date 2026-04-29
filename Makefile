@@ -12,4 +12,4 @@ check: test
 	git diff --check
 
 status-demo:
-	GOCACHE=$(GOCACHE) go run . status
+	GOCACHE=$(GOCACHE) go run ./cmd/codex-switch status

@@ -20,7 +20,7 @@ make install
 Or run without installing:
 
 ```bash
-go run . status
+go run ./cmd/codex-switch status
 ```
 
 ## First setup

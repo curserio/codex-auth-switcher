@@ -25,13 +25,8 @@ const (
 	switchLogName      = "switch.log"
 )
 
-type authSidecarFile struct {
-	Name              string
-	RemoveWhenMissing bool
-}
-
-var authSidecarFiles = []authSidecarFile{
-	{Name: installationIDName},
+var authSidecarFiles = []string{
+	installationIDName,
 }
 
 var accountNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
@@ -398,17 +393,17 @@ func (s Store) backupCurrentAuth() error {
 
 func (s Store) saveAuthSidecarFiles(profileDir string) error {
 	for _, file := range authSidecarFiles {
-		data, err := os.ReadFile(filepath.Join(s.CodexHome, file.Name))
+		data, err := os.ReadFile(filepath.Join(s.CodexHome, file))
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				if removeErr := os.Remove(filepath.Join(profileDir, file.Name)); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+				if removeErr := os.Remove(filepath.Join(profileDir, file)); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
 					return removeErr
 				}
 				continue
 			}
-			return fmt.Errorf("read current codex %s: %w", file.Name, err)
+			return fmt.Errorf("read current codex %s: %w", file, err)
 		}
-		if err := WriteFileAtomic(filepath.Join(profileDir, file.Name), data, 0o600); err != nil {
+		if err := WriteFileAtomic(filepath.Join(profileDir, file), data, 0o600); err != nil {
 			return err
 		}
 	}
@@ -418,31 +413,25 @@ func (s Store) saveAuthSidecarFiles(profileDir string) error {
 func readProfileAuthSidecars(profileDir string) (map[string][]byte, error) {
 	files := make(map[string][]byte, len(authSidecarFiles))
 	for _, file := range authSidecarFiles {
-		data, err := os.ReadFile(filepath.Join(profileDir, file.Name))
+		data, err := os.ReadFile(filepath.Join(profileDir, file))
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return nil, fmt.Errorf("read profile %s: %w", file.Name, err)
+			return nil, fmt.Errorf("read profile %s: %w", file, err)
 		}
-		files[file.Name] = data
+		files[file] = data
 	}
 	return files, nil
 }
 
 func (s Store) writeAuthSidecarFiles(files map[string][]byte) error {
 	for _, file := range authSidecarFiles {
-		data, ok := files[file.Name]
+		data, ok := files[file]
 		if !ok {
-			if !file.RemoveWhenMissing {
-				continue
-			}
-			if err := os.Remove(filepath.Join(s.CodexHome, file.Name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return err
-			}
 			continue
 		}
-		if err := WriteFileAtomic(filepath.Join(s.CodexHome, file.Name), data, 0o600); err != nil {
+		if err := WriteFileAtomic(filepath.Join(s.CodexHome, file), data, 0o600); err != nil {
 			return err
 		}
 	}

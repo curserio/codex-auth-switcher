@@ -8,10 +8,6 @@ import (
 	"github.com/curserio/codex-auth-switcher/internal/usage"
 )
 
-func formatReset(ts *int64) string {
-	return formatResetAt(ts, time.Now())
-}
-
 func formatResetAt(ts *int64, now time.Time) string {
 	if ts == nil {
 		return "unknown"
