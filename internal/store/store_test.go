@@ -30,6 +30,7 @@ func TestAddAndSwitchTo(t *testing.T) {
 	st := New(root, codexHome)
 
 	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "first-install")
 	meta, err := st.Add("first")
 	if err != nil {
 		t.Fatalf("Add(first) error = %v", err)
@@ -39,6 +40,7 @@ func TestAddAndSwitchTo(t *testing.T) {
 	}
 
 	writeAuth(t, filepath.Join(codexHome, "auth.json"), "second@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "second-install")
 	if _, err := st.Add("second"); err != nil {
 		t.Fatalf("Add(second) error = %v", err)
 	}
@@ -60,6 +62,80 @@ func TestAddAndSwitchTo(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("auth permissions = %v", info.Mode().Perm())
 	}
+	installationID, err := os.ReadFile(filepath.Join(codexHome, "installation_id"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bytesTrimSpace(installationID)) != "first-install" {
+		t.Fatalf("switched installation_id = %s, want first-install", installationID)
+	}
+}
+
+func TestAddAllowsMissingInstallationID(t *testing.T) {
+	root := t.TempDir()
+	codexHome := t.TempDir()
+	st := New(root, codexHome)
+
+	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	if _, err := st.Add("first"); err != nil {
+		t.Fatalf("Add(first) error = %v", err)
+	}
+}
+
+func TestSwitchToLeavesInstallationIDWhenProfileHasNone(t *testing.T) {
+	root := t.TempDir()
+	codexHome := t.TempDir()
+	st := New(root, codexHome)
+
+	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "first-install")
+	if _, err := st.Add("first"); err != nil {
+		t.Fatalf("Add(first) error = %v", err)
+	}
+	if err := os.Remove(filepath.Join(root, "accounts", "first", "installation_id")); err != nil {
+		t.Fatal(err)
+	}
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "active-install")
+
+	if err := st.SwitchTo("first"); err != nil {
+		t.Fatalf("SwitchTo(first) error = %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(codexHome, "installation_id"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bytesTrimSpace(data)) != "active-install" {
+		t.Fatalf("installation_id = %s, want active-install", data)
+	}
+}
+
+func TestPrepareLoginClearsAuthAndRotatesInstallationID(t *testing.T) {
+	root := t.TempDir()
+	codexHome := t.TempDir()
+	st := New(root, codexHome)
+
+	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "first-install")
+	if _, err := st.Add("first"); err != nil {
+		t.Fatalf("Add(first) error = %v", err)
+	}
+
+	if err := st.PrepareLogin(); err != nil {
+		t.Fatalf("PrepareLogin error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(codexHome, "auth.json")); !os.IsNotExist(err) {
+		t.Fatalf("auth still exists, stat err = %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(codexHome, "installation_id"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(bytesTrimSpace(data)); got == "" || got == "first-install" {
+		t.Fatalf("installation_id = %q, want new non-empty id", got)
+	}
+	if _, err := os.Stat(filepath.Join(root, "current")); !os.IsNotExist(err) {
+		t.Fatalf("current hint still exists, stat err = %v", err)
+	}
 }
 
 func TestAddRejectsDuplicateCurrentAuth(t *testing.T) {
@@ -68,6 +144,7 @@ func TestAddRejectsDuplicateCurrentAuth(t *testing.T) {
 	st := New(root, codexHome)
 
 	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "first-install")
 	if _, err := st.Add("first"); err != nil {
 		t.Fatalf("Add(first) error = %v", err)
 	}
@@ -83,10 +160,12 @@ func TestCurrentFollowsManualAuthChange(t *testing.T) {
 	st := New(root, codexHome)
 
 	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "first-install")
 	if _, err := st.Add("first"); err != nil {
 		t.Fatalf("Add(first) error = %v", err)
 	}
 	writeAuth(t, filepath.Join(codexHome, "auth.json"), "second@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "second-install")
 	if _, err := st.Add("second"); err != nil {
 		t.Fatalf("Add(second) error = %v", err)
 	}
@@ -107,6 +186,7 @@ func TestRenameAndDelete(t *testing.T) {
 	st := New(root, codexHome)
 
 	writeAuth(t, filepath.Join(codexHome, "auth.json"), "first@example.com")
+	writeInstallationID(t, filepath.Join(codexHome, "installation_id"), "first-install")
 	if _, err := st.Add("first"); err != nil {
 		t.Fatalf("Add(first) error = %v", err)
 	}
@@ -132,6 +212,13 @@ func writeAuth(t *testing.T, path, email string) {
 	token := makeJWT(map[string]any{"email": email, "sub": "sub-" + email})
 	data := []byte(`{"auth_mode":"chatgpt","tokens":{"id_token":"` + token + `","account_id":"acct-` + email + `"}}`)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeInstallationID(t *testing.T, path, id string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(id+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

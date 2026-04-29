@@ -46,6 +46,13 @@ func Run(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		fmt.Fprintf(stdout, "saved %s (%s)\n", args[1], meta.Email)
+		if record, err := capture(context.Background()); err == nil {
+			_ = st.SaveUsage(args[1], record)
+			_ = st.SaveCurrentAuthToProfile(args[1])
+			fmt.Fprintf(stderr, "captured %s usage from %s\n", args[1], record.Source)
+		} else {
+			fmt.Fprintf(stderr, "warning: could not capture usage for %s: %v\n", args[1], err)
+		}
 	case "current":
 		name, err := st.Current()
 		if err != nil {
@@ -61,19 +68,43 @@ func Run(args []string, stdout, stderr io.Writer) error {
 		if err != nil {
 			return err
 		}
-		record, err := capture(context.Background(), codexHome)
+		record, err := capture(context.Background())
 		if err != nil {
 			return err
 		}
 		if err := st.SaveUsage(name, record); err != nil {
 			return err
 		}
+		if err := st.SaveCurrentAuthToProfile(name); err != nil {
+			return err
+		}
 		fmt.Fprintf(stdout, "captured usage for %s from %s\n", name, record.Source)
+	case "prepare-login", "prepare":
+		if len(args) != 1 {
+			return errors.New("usage: codex-switch prepare-login")
+		}
+		if current, active, err := st.ActiveProfile(); err == nil && active {
+			if record, err := capture(context.Background()); err == nil {
+				_ = st.SaveUsage(current, record)
+				fmt.Fprintf(stderr, "captured %s usage from %s\n", current, record.Source)
+			} else {
+				fmt.Fprintf(stderr, "warning: could not capture usage for %s: %v\n", current, err)
+			}
+			if err := st.SaveCurrentAuthToProfile(current); err != nil {
+				return err
+			}
+			fmt.Fprintf(stderr, "saved current auth to %s\n", current)
+		}
+		if err := st.PrepareLogin(); err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, "prepared clean Codex auth state for login")
+		fmt.Fprintln(stdout, "log in with Codex, then run: codex-switch add <name>")
 	case "use":
 		if len(args) != 2 {
 			return errors.New("usage: codex-switch use <name>")
 		}
-		return useAccount(stdout, stderr, st, codexHome, args[1])
+		return useAccount(stdout, stderr, st, args[1])
 	case "rename":
 		if len(args) != 3 {
 			return errors.New("usage: codex-switch rename <old> <new>")
@@ -96,10 +127,10 @@ func Run(args []string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-func useAccount(stdout, stderr io.Writer, st store.Store, codexHome, target string) error {
+func useAccount(stdout, stderr io.Writer, st store.Store, target string) error {
 	current, active, currentErr := st.ActiveProfile()
 	if currentErr == nil && active {
-		if record, err := capture(context.Background(), codexHome); err == nil {
+		if record, err := capture(context.Background()); err == nil {
 			_ = st.SaveUsage(current, record)
 			fmt.Fprintf(stderr, "captured %s usage from %s\n", current, record.Source)
 		} else {
@@ -119,6 +150,19 @@ func useAccount(stdout, stderr io.Writer, st store.Store, codexHome, target stri
 	if err := st.SwitchTo(target); err != nil {
 		return err
 	}
+	if record, err := capture(context.Background()); err == nil {
+		_ = st.SaveUsage(target, record)
+		_ = st.SaveCurrentAuthToProfile(target)
+		fmt.Fprintf(stderr, "captured %s usage from %s\n", target, record.Source)
+	} else {
+		if currentErr == nil && active && current != target {
+			if rollbackErr := st.SwitchTo(current); rollbackErr != nil {
+				return fmt.Errorf("switched to %s, but validation failed: %v; rollback to %s failed: %w", target, err, current, rollbackErr)
+			}
+			return fmt.Errorf("target %s auth validation failed: %v; restored %s", target, err, current)
+		}
+		return fmt.Errorf("target %s auth validation failed: %w", target, err)
+	}
 	fmt.Fprintf(stdout, "switched to %s\n", target)
 	fmt.Fprintln(stdout, "restart/resume Codex or reload VS Code if an existing process keeps the old token in memory")
 	return nil
@@ -137,18 +181,12 @@ func activeProfileName(st store.Store) (string, error) {
 	return "", fmt.Errorf("current Codex auth (%s) is not a saved profile; run codex-switch add <name> first", valueOr(meta.Email, "unknown"))
 }
 
-func capture(ctx context.Context, codexHome string) (usage.Record, error) {
+func capture(ctx context.Context) (usage.Record, error) {
 	record, err := usage.CaptureFromAppServer(ctx)
 	if err == nil {
 		return record, nil
 	}
-	fallback, fallbackErr := usage.CaptureFromJSONL(codexHome)
-	if fallbackErr != nil {
-		return usage.Record{}, fmt.Errorf("app-server: %v; jsonl fallback: %v", err, fallbackErr)
-	}
-	fallback.Stale = true
-	fallback.Error = err.Error()
-	return fallback, nil
+	return usage.Record{}, fmt.Errorf("app-server: %v", err)
 }
 
 func printList(stdout io.Writer, st store.Store) error {
@@ -248,6 +286,7 @@ Usage:
   codex-switch rename <old> <new>
   codex-switch delete <name>
   codex-switch capture
+  codex-switch prepare-login
   codex-switch status
   codex-switch list
   codex-switch current

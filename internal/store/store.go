@@ -1,6 +1,8 @@
 package store
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,12 +17,22 @@ import (
 )
 
 const (
-	authFileName    = "auth.json"
-	metaFileName    = "meta.json"
-	usageFileName   = "usage.json"
-	currentFileName = "current"
-	switchLogName   = "switch.log"
+	authFileName       = "auth.json"
+	installationIDName = "installation_id"
+	metaFileName       = "meta.json"
+	usageFileName      = "usage.json"
+	currentFileName    = "current"
+	switchLogName      = "switch.log"
 )
+
+type authSidecarFile struct {
+	Name              string
+	RemoveWhenMissing bool
+}
+
+var authSidecarFiles = []authSidecarFile{
+	{Name: installationIDName},
+}
 
 var accountNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
@@ -109,6 +121,9 @@ func (s Store) Add(name string) (auth.Metadata, error) {
 		return auth.Metadata{}, err
 	}
 	if err := WriteFileAtomic(filepath.Join(dir, authFileName), data, 0o600); err != nil {
+		return auth.Metadata{}, err
+	}
+	if err := s.saveAuthSidecarFiles(dir); err != nil {
 		return auth.Metadata{}, err
 	}
 	if err := WriteJSONAtomic(filepath.Join(dir, metaFileName), meta, 0o600); err != nil {
@@ -244,6 +259,29 @@ func (s Store) SaveUsage(name string, record usage.Record) error {
 	return WriteJSONAtomic(filepath.Join(s.accountDir(name), usageFileName), record, 0o600)
 }
 
+func (s Store) PrepareLogin() error {
+	if err := s.Init(); err != nil {
+		return err
+	}
+	if err := s.backupCurrentAuth(); err != nil {
+		return err
+	}
+	if err := os.Remove(s.codexAuthPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	id, err := newInstallationID()
+	if err != nil {
+		return err
+	}
+	if err := WriteFileAtomic(filepath.Join(s.CodexHome, installationIDName), []byte(id+"\n"), 0o600); err != nil {
+		return err
+	}
+	if err := os.Remove(s.currentPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
 func (s Store) Rename(oldName, newName string) error {
 	if err := ValidateAccountName(oldName); err != nil {
 		return err
@@ -303,6 +341,9 @@ func (s Store) SaveCurrentAuthToProfile(name string) error {
 	if err := WriteFileAtomic(filepath.Join(dir, authFileName), data, 0o600); err != nil {
 		return err
 	}
+	if err := s.saveAuthSidecarFiles(dir); err != nil {
+		return err
+	}
 	if meta, err := auth.MetadataFromAuthJSON(data); err == nil {
 		_ = WriteJSONAtomic(filepath.Join(dir, metaFileName), meta, 0o600)
 	}
@@ -321,10 +362,17 @@ func (s Store) SwitchTo(name string) error {
 	if _, err := auth.MetadataFromAuthJSON(data); err != nil {
 		return fmt.Errorf("validate profile auth: %w", err)
 	}
+	sidecars, err := readProfileAuthSidecars(s.accountDir(name))
+	if err != nil {
+		return err
+	}
 	if err := s.backupCurrentAuth(); err != nil {
 		return err
 	}
 	if err := WriteFileAtomic(s.codexAuthPath(), data, 0o600); err != nil {
+		return err
+	}
+	if err := s.writeAuthSidecarFiles(sidecars); err != nil {
 		return err
 	}
 	if err := s.SetCurrent(name); err != nil {
@@ -346,6 +394,75 @@ func (s Store) backupCurrentAuth() error {
 	}
 	name := "auth-" + time.Now().UTC().Format("20060102T150405.000000000Z") + ".json"
 	return WriteFileAtomic(filepath.Join(s.Root, "backups", name), data, 0o600)
+}
+
+func (s Store) saveAuthSidecarFiles(profileDir string) error {
+	for _, file := range authSidecarFiles {
+		data, err := os.ReadFile(filepath.Join(s.CodexHome, file.Name))
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				if removeErr := os.Remove(filepath.Join(profileDir, file.Name)); removeErr != nil && !errors.Is(removeErr, fs.ErrNotExist) {
+					return removeErr
+				}
+				continue
+			}
+			return fmt.Errorf("read current codex %s: %w", file.Name, err)
+		}
+		if err := WriteFileAtomic(filepath.Join(profileDir, file.Name), data, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readProfileAuthSidecars(profileDir string) (map[string][]byte, error) {
+	files := make(map[string][]byte, len(authSidecarFiles))
+	for _, file := range authSidecarFiles {
+		data, err := os.ReadFile(filepath.Join(profileDir, file.Name))
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			return nil, fmt.Errorf("read profile %s: %w", file.Name, err)
+		}
+		files[file.Name] = data
+	}
+	return files, nil
+}
+
+func (s Store) writeAuthSidecarFiles(files map[string][]byte) error {
+	for _, file := range authSidecarFiles {
+		data, ok := files[file.Name]
+		if !ok {
+			if !file.RemoveWhenMissing {
+				continue
+			}
+			if err := os.Remove(filepath.Join(s.CodexHome, file.Name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			continue
+		}
+		if err := WriteFileAtomic(filepath.Join(s.CodexHome, file.Name), data, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func newInstallationID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%s-%s-%s-%s-%s",
+		hex.EncodeToString(b[0:4]),
+		hex.EncodeToString(b[4:6]),
+		hex.EncodeToString(b[6:8]),
+		hex.EncodeToString(b[8:10]),
+		hex.EncodeToString(b[10:16]),
+	), nil
 }
 
 func (s Store) appendSwitchLog(name string) error {
