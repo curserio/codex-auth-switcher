@@ -4,7 +4,21 @@ Local account switcher for OpenAI Codex CLI auth profiles.
 
 It keeps Codex chats and local state shared, and switches Codex auth files.
 
+This is an unofficial tool and is not affiliated with OpenAI.
+
+## Requirements
+
+- Go matching the version in `go.mod`
+- OpenAI Codex CLI installed
+- At least one Codex CLI login completed through the normal Codex flow
+
 ## Install
+
+```bash
+go install github.com/curserio/codex-auth-switcher/cmd/codex-switch@latest
+```
+
+For local development:
 
 ```bash
 cd codex-auth-switcher
@@ -123,3 +137,25 @@ rotates it before the next login. `.credentials.json` is not managed by this
 tool; MCP/app credentials stay shared across profiles.
 
 Auth files are written with `0600` permissions. The tool never prints tokens.
+
+## Safety and Privacy
+
+`codex-switch` modifies local Codex CLI auth state:
+
+- `~/.codex/auth.json`
+- `~/.codex/installation_id`
+- `~/.codex-auth-switcher`
+
+The profile store can contain usable local auth material. Do not publish,
+share, or attach profile directories, `auth.json`, Codex session logs, or
+terminal output containing tokens. Use `codex-switch doctor` to inspect local
+state without printing raw auth data.
+
+## Maintainer Notes
+
+Recommended GitHub settings:
+
+- Repository topics: `codex`, `openai`, `cli`, `go`, `auth`, `developer-tools`
+- Enable secret scanning
+- Protect the default branch
+- Create the first release tag as `v0.1.0`
