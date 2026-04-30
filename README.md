@@ -90,6 +90,8 @@ rejected to avoid accidentally making two profiles point at the same login.
 codex-switch status
 codex-switch status --json
 codex-switch capture
+codex-switch cleanup
+codex-switch cleanup --apply
 codex-switch doctor
 codex-switch list
 codex-switch current
@@ -102,6 +104,10 @@ session jsonl snapshots as a fallback.
 
 `status --json` prints machine-readable profile and usage state without tokens
 or raw auth data.
+
+`cleanup` removes old switcher-generated backups and trims `switch.log`.
+It is a dry-run by default; pass `--apply` to make changes. Profiles and
+active Codex auth files are never cleaned by this command.
 
 `doctor` checks local profile files, duplicate identities, active profile
 matching, and live app-server usage for the active account. It exits non-zero

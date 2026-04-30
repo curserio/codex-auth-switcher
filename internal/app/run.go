@@ -83,6 +83,8 @@ func (a App) run(args []string, root string) error {
 		return a.runStatus(args)
 	case "capture":
 		return a.runCapture(args)
+	case "cleanup":
+		return a.runCleanup(args)
 	case "prepare-login", "prepare":
 		return a.runPrepareLogin(args)
 	case "doctor":
@@ -123,6 +125,7 @@ Usage:
   codex-switch rename <old> <new>
   codex-switch delete <name>
   codex-switch capture
+  codex-switch cleanup [--apply] [--days N] [--keep N] [--log-lines N]
   codex-switch prepare-login
   codex-switch doctor
   codex-switch status [--json]
