@@ -93,6 +93,9 @@ or raw auth data.
 matching, and live app-server usage for the active account. It exits non-zero
 when a failure is found.
 
+If `codex` is not on `PATH`, set `CODEX_SWITCH_CODEX_BIN` to the Codex CLI
+binary path before running commands that read live usage.
+
 ## Development
 
 ```bash

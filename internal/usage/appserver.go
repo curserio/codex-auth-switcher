@@ -4,15 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
+
+const codexBinEnv = "CODEX_SWITCH_CODEX_BIN"
 
 func CaptureFromAppServer(ctx context.Context) (Record, error) {
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "codex", "app-server", "--listen", "stdio://")
+	cmd := exec.CommandContext(ctx, codexBinary(), "app-server", "--listen", "stdio://")
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return Record{}, err
@@ -101,4 +105,11 @@ func readResponse(dec *json.Decoder, id int) (json.RawMessage, error) {
 			return line, nil
 		}
 	}
+}
+
+func codexBinary() string {
+	if v := os.Getenv(codexBinEnv); v != "" {
+		return filepath.Clean(v)
+	}
+	return "codex"
 }

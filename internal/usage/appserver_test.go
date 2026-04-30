@@ -2,6 +2,7 @@ package usage
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -25,5 +26,19 @@ func TestReadResponseSkipsOtherIDs(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), `"ok":true`) {
 		t.Fatalf("readResponse raw = %s", raw)
+	}
+}
+
+func TestCodexBinaryUsesConfiguredPath(t *testing.T) {
+	t.Setenv(codexBinEnv, filepath.Join("custom", "codex"))
+	if got := codexBinary(); got != filepath.Join("custom", "codex") {
+		t.Fatalf("codexBinary() = %q", got)
+	}
+}
+
+func TestCodexBinaryDefaultsToCodex(t *testing.T) {
+	t.Setenv(codexBinEnv, "")
+	if got := codexBinary(); got != "codex" {
+		t.Fatalf("codexBinary() = %q, want codex", got)
 	}
 }

@@ -129,7 +129,8 @@ Usage:
 
 Environment:
   CODEX_HOME          defaults to ~/.codex
-  CODEX_SWITCH_HOME  defaults to ~/.codex-auth-switcher`)
+  CODEX_SWITCH_HOME  defaults to ~/.codex-auth-switcher
+  CODEX_SWITCH_CODEX_BIN  defaults to codex`)
 }
 
 func usageError(command string) error {
