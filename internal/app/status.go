@@ -2,8 +2,10 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"sort"
 	"time"
 
@@ -56,7 +58,10 @@ func (a App) runStatus(args []string) error {
 }
 
 func loadStatusData(st store.Store) (statusData, error) {
-	current, _ := st.Current()
+	current, currentErr := st.Current()
+	if currentErr != nil && !errors.Is(currentErr, fs.ErrNotExist) {
+		return statusData{}, fmt.Errorf("read current profile: %w", currentErr)
+	}
 	activeName, activeOK, activeErr := st.ActiveProfile()
 	activeLabel := valueOr(current, "unknown")
 	if activeErr == nil && activeOK {

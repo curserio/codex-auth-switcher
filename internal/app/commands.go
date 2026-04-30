@@ -29,11 +29,15 @@ func (a App) runAdd(args []string) error {
 	}
 	fmt.Fprintf(a.stdout, "saved %s (%s)\n", args[1], meta.Email)
 	if record, err := a.capture(context.Background()); err == nil {
-		_ = a.store.SaveUsage(args[1], record)
-		_ = a.store.SaveCurrentAuthToProfile(args[1])
+		if saveErr := a.store.SaveUsage(args[1], record); saveErr != nil {
+			warn(a.stderr, "could not save usage for %s: %v", args[1], saveErr)
+		}
+		if saveErr := a.store.SaveCurrentAuthToProfile(args[1]); saveErr != nil {
+			warn(a.stderr, "could not refresh saved auth for %s: %v", args[1], saveErr)
+		}
 		fmt.Fprintf(a.stderr, "captured %s usage from %s\n", args[1], record.Source)
 	} else {
-		fmt.Fprintf(a.stderr, "warning: could not capture usage for %s: %v\n", args[1], err)
+		warn(a.stderr, "could not capture usage for %s: %v", args[1], err)
 	}
 	return nil
 }
@@ -79,10 +83,12 @@ func (a App) runPrepareLogin(args []string) error {
 	}
 	if current, active, err := a.store.ActiveProfile(); err == nil && active {
 		if record, err := a.capture(context.Background()); err == nil {
-			_ = a.store.SaveUsage(current, record)
+			if saveErr := a.store.SaveUsage(current, record); saveErr != nil {
+				warn(a.stderr, "could not save usage for %s: %v", current, saveErr)
+			}
 			fmt.Fprintf(a.stderr, "captured %s usage from %s\n", current, record.Source)
 		} else {
-			fmt.Fprintf(a.stderr, "warning: could not capture usage for %s: %v\n", current, err)
+			warn(a.stderr, "could not capture usage for %s: %v", current, err)
 		}
 		if err := a.store.SaveCurrentAuthToProfile(current); err != nil {
 			return err
@@ -130,10 +136,12 @@ func useAccount(stdout, stderr io.Writer, st store.Store, target string, capture
 	current, active, currentErr := st.ActiveProfile()
 	if currentErr == nil && active {
 		if record, err := capture(context.Background()); err == nil {
-			_ = st.SaveUsage(current, record)
+			if saveErr := st.SaveUsage(current, record); saveErr != nil {
+				warn(stderr, "could not save usage for %s: %v", current, saveErr)
+			}
 			fmt.Fprintf(stderr, "captured %s usage from %s\n", current, record.Source)
 		} else {
-			fmt.Fprintf(stderr, "warning: could not capture usage for %s: %v\n", current, err)
+			warn(stderr, "could not capture usage for %s: %v", current, err)
 		}
 		if err := st.SaveCurrentAuthToProfile(current); err != nil {
 			return err
@@ -150,8 +158,12 @@ func useAccount(stdout, stderr io.Writer, st store.Store, target string, capture
 		return err
 	}
 	if record, err := capture(context.Background()); err == nil {
-		_ = st.SaveUsage(target, record)
-		_ = st.SaveCurrentAuthToProfile(target)
+		if saveErr := st.SaveUsage(target, record); saveErr != nil {
+			warn(stderr, "could not save usage for %s: %v", target, saveErr)
+		}
+		if saveErr := st.SaveCurrentAuthToProfile(target); saveErr != nil {
+			return fmt.Errorf("target %s auth validation succeeded, but refreshing saved auth failed: %w", target, saveErr)
+		}
 		fmt.Fprintf(stderr, "captured %s usage from %s\n", target, record.Source)
 	} else {
 		if currentErr == nil && active && current != target {
@@ -165,6 +177,10 @@ func useAccount(stdout, stderr io.Writer, st store.Store, target string, capture
 	fmt.Fprintf(stdout, "switched to %s\n", target)
 	fmt.Fprintln(stdout, "restart/resume Codex or reload VS Code if an existing process keeps the old token in memory")
 	return nil
+}
+
+func warn(w io.Writer, format string, args ...any) {
+	fmt.Fprintf(w, "warning: "+format+"\n", args...)
 }
 
 func activeProfileName(st store.Store) (string, error) {

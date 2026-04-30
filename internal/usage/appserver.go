@@ -17,6 +17,7 @@ func CaptureFromAppServer(ctx context.Context) (Record, error) {
 	if err != nil {
 		return Record{}, err
 	}
+	defer stdin.Close()
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return Record{}, err
@@ -85,12 +86,18 @@ func readResponse(dec *json.Decoder, id int) (json.RawMessage, error) {
 			return nil, err
 		}
 		var header struct {
-			ID *int `json:"id"`
+			ID    *int `json:"id"`
+			Error *struct {
+				Message string `json:"message"`
+			} `json:"error"`
 		}
 		if err := json.Unmarshal(line, &header); err != nil {
 			continue
 		}
 		if header.ID != nil && *header.ID == id {
+			if header.Error != nil {
+				return nil, errors.New(header.Error.Message)
+			}
 			return line, nil
 		}
 	}

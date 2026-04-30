@@ -48,14 +48,19 @@ func runDoctor(stdout io.Writer, st store.Store, capture captureFunc) error {
 
 func doctorChecks(st store.Store, capture captureFunc) []doctorCheck {
 	var checks []doctorCheck
-	accounts, err := st.List()
+	names, err := st.ProfileNames()
 	if err != nil {
 		return []doctorCheck{{Severity: doctorFail, Message: "read switch store: " + err.Error()}}
 	}
-	checks = append(checks, doctorCheck{Severity: doctorOK, Message: fmt.Sprintf("read switch store (%d profiles)", len(accounts))})
+	checks = append(checks, doctorCheck{Severity: doctorOK, Message: fmt.Sprintf("read switch store (%d profiles)", len(names))})
 
 	seen := make(map[string]string)
-	for _, acct := range accounts {
+	for _, name := range names {
+		acct, err := st.ReadAccount(name)
+		if err != nil {
+			checks = append(checks, doctorCheck{Severity: doctorFail, Message: fmt.Sprintf("profile %s auth is unreadable: %v", name, err)})
+			continue
+		}
 		if acct.Meta.Email == "" {
 			checks = append(checks, doctorCheck{Severity: doctorFail, Message: fmt.Sprintf("profile %s auth is unreadable", acct.Name)})
 			continue

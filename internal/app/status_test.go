@@ -132,3 +132,17 @@ func TestStatusActiveLabel(t *testing.T) {
 		}
 	})
 }
+
+func TestStatusFailsOnInvalidStoredCurrent(t *testing.T) {
+	root := t.TempDir()
+	codexHome := t.TempDir()
+	t.Setenv("CODEX_SWITCH_HOME", root)
+	t.Setenv("CODEX_HOME", codexHome)
+
+	writeTestFile(t, filepath.Join(root, "current"), "../bad\n")
+	var stdout, stderr strings.Builder
+	err := runWithOptions([]string{"status"}, &stdout, &stderr, runOptions{capture: fixedCapture(recordWithResets(t, "2026-04-29T12:00:00Z", 10, 20, 3600, 7200), nil), now: fixedNow(t)})
+	if err == nil || !strings.Contains(err.Error(), "current") {
+		t.Fatalf("status error = %v, want current error", err)
+	}
+}
