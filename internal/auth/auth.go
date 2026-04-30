@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Metadata is the stable, non-secret identity extracted from Codex auth.json.
 type Metadata struct {
 	Email     string `json:"email"`
 	Subject   string `json:"subject,omitempty"`
@@ -15,6 +16,7 @@ type Metadata struct {
 	AccountID string `json:"account_id,omitempty"`
 }
 
+// MetadataFromAuthJSON parses auth.json and returns only non-token account metadata.
 func MetadataFromAuthJSON(data []byte) (Metadata, error) {
 	var raw struct {
 		AuthMode string `json:"auth_mode"`

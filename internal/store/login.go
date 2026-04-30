@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 )
 
+// Init creates the codex-switch directory layout if it does not already exist.
 func (s Store) Init() error {
 	if err := os.MkdirAll(filepath.Join(s.Root, "accounts"), 0o700); err != nil {
 		return err
@@ -20,6 +21,8 @@ func (s Store) Init() error {
 	return nil
 }
 
+// PrepareLogin removes local auth state and rotates installation_id before a new login.
+// It intentionally does not call Codex logout, because logout can revoke server tokens.
 func (s Store) PrepareLogin() error {
 	if err := s.Init(); err != nil {
 		return err

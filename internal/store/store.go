@@ -21,21 +21,26 @@ const (
 
 var accountNamePattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
+// Store owns the local codex-switch profile directory and the active Codex home.
+// Methods on Store only move local files; they never call Codex network APIs.
 type Store struct {
 	Root      string
 	CodexHome string
 }
 
+// Account is the non-secret profile state shown by list/status commands.
 type Account struct {
 	Name  string        `json:"name"`
 	Meta  auth.Metadata `json:"meta"`
 	Usage *usage.Record `json:"usage,omitempty"`
 }
 
+// New creates a Store rooted at the switcher data directory and Codex home.
 func New(root, codexHome string) Store {
 	return Store{Root: root, CodexHome: codexHome}
 }
 
+// DefaultRoot returns the default codex-switch profile directory.
 func DefaultRoot() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -44,6 +49,7 @@ func DefaultRoot() (string, error) {
 	return filepath.Join(home, ".codex-auth-switcher"), nil
 }
 
+// DefaultCodexHome returns CODEX_HOME or the default Codex state directory.
 func DefaultCodexHome() (string, error) {
 	if v := os.Getenv("CODEX_HOME"); v != "" {
 		return v, nil
@@ -55,6 +61,7 @@ func DefaultCodexHome() (string, error) {
 	return filepath.Join(home, ".codex"), nil
 }
 
+// ValidateAccountName rejects path-like names before they are joined into store paths.
 func ValidateAccountName(name string) error {
 	if name == "" {
 		return errors.New("account name is required")

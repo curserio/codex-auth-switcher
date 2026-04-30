@@ -2,6 +2,7 @@ package usage
 
 import "time"
 
+// Record is the persisted, non-secret rate-limit snapshot for a profile.
 type Record struct {
 	CapturedAt time.Time `json:"captured_at"`
 	Source     string    `json:"source"`
@@ -12,6 +13,7 @@ type Record struct {
 	Error      string    `json:"error,omitempty"`
 }
 
+// Window is one rate-limit window, such as the 5-hour or weekly limit.
 type Window struct {
 	UsedPercent int    `json:"used_percent"`
 	LeftPercent int    `json:"left_percent"`

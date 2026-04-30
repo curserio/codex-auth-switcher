@@ -20,6 +20,7 @@ type runOptions struct {
 	now     func() time.Time
 }
 
+// App wires command handlers to the profile store and live usage capture.
 type App struct {
 	stderr  io.Writer
 	stdout  io.Writer
@@ -28,6 +29,7 @@ type App struct {
 	now     func() time.Time
 }
 
+// Run executes the codex-switch CLI with process-level defaults.
 func Run(args []string, stdout, stderr io.Writer) error {
 	return runWithOptions(args, stdout, stderr, runOptions{
 		capture: capture,

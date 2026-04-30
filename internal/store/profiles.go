@@ -12,6 +12,7 @@ import (
 	"github.com/curserio/codex-auth-switcher/internal/usage"
 )
 
+// Add saves the current Codex auth as a named profile and marks it current.
 func (s Store) Add(name string) (auth.Metadata, error) {
 	if err := ValidateAccountName(name); err != nil {
 		return auth.Metadata{}, err
@@ -54,6 +55,7 @@ func (s Store) Add(name string) (auth.Metadata, error) {
 	return meta, nil
 }
 
+// FindProfileByMetadata matches profiles by stable identity, not by profile name.
 func (s Store) FindProfileByMetadata(meta auth.Metadata) (string, bool, error) {
 	names, err := s.ProfileNames()
 	if err != nil {
@@ -71,6 +73,8 @@ func (s Store) FindProfileByMetadata(meta auth.Metadata) (string, bool, error) {
 	return "", false, nil
 }
 
+// List returns all readable profiles.
+// A corrupt profile is returned as an error so doctor/status cannot hide it.
 func (s Store) List() ([]Account, error) {
 	names, err := s.ProfileNames()
 	if err != nil {
@@ -87,6 +91,7 @@ func (s Store) List() ([]Account, error) {
 	return accounts, nil
 }
 
+// ProfileNames returns valid profile directory names without parsing profile contents.
 func (s Store) ProfileNames() ([]string, error) {
 	entries, err := os.ReadDir(filepath.Join(s.Root, "accounts"))
 	if err != nil {
@@ -109,6 +114,8 @@ func (s Store) ProfileNames() ([]string, error) {
 	return names, nil
 }
 
+// ReadAccount parses profile auth and cached usage without returning token material.
+// meta.json is treated as a cache; auth.json remains the source of truth.
 func (s Store) ReadAccount(name string) (Account, error) {
 	if err := ValidateAccountName(name); err != nil {
 		return Account{}, err
@@ -139,6 +146,7 @@ func (s Store) ReadAccount(name string) (Account, error) {
 	return Account{Name: name, Meta: meta, Usage: usageRecord}, nil
 }
 
+// SaveUsage stores the latest non-secret usage snapshot for a profile.
 func (s Store) SaveUsage(name string, record usage.Record) error {
 	if err := ValidateAccountName(name); err != nil {
 		return err
@@ -146,6 +154,7 @@ func (s Store) SaveUsage(name string, record usage.Record) error {
 	return WriteJSONAtomic(filepath.Join(s.accountDir(name), usageFileName), record, 0o600)
 }
 
+// Rename moves a profile directory and updates the stored current hint when needed.
 func (s Store) Rename(oldName, newName string) error {
 	if err := ValidateAccountName(oldName); err != nil {
 		return err
@@ -175,6 +184,7 @@ func (s Store) Rename(oldName, newName string) error {
 	return nil
 }
 
+// Delete removes a profile and clears the current hint if it pointed at that profile.
 func (s Store) Delete(name string) error {
 	if err := ValidateAccountName(name); err != nil {
 		return err

@@ -12,6 +12,8 @@ import (
 
 const codexBinEnv = "CODEX_SWITCH_CODEX_BIN"
 
+// CaptureFromAppServer reads live rate limits through `codex app-server`.
+// It shells out instead of parsing local files so status reflects the active token.
 func CaptureFromAppServer(ctx context.Context) (Record, error) {
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
@@ -98,6 +100,7 @@ func readResponse(dec *json.Decoder, id int) (json.RawMessage, error) {
 		if err := json.Unmarshal(line, &header); err != nil {
 			continue
 		}
+		// app-server can emit notifications or replies for earlier requests; match by id.
 		if header.ID != nil && *header.ID == id {
 			if header.Error != nil {
 				return nil, errors.New(header.Error.Message)

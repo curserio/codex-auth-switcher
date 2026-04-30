@@ -15,12 +15,14 @@ var authSidecarFiles = []string{
 	installationIDName,
 }
 
+// switchState is the local state needed to undo a partially completed switch.
 type switchState struct {
 	authFiles     map[string][]byte
 	current       []byte
 	currentExists bool
 }
 
+// SaveCurrentAuthToProfile refreshes a profile with the active Codex auth files.
 func (s Store) SaveCurrentAuthToProfile(name string) error {
 	if err := ValidateAccountName(name); err != nil {
 		return err
@@ -45,6 +47,8 @@ func (s Store) SaveCurrentAuthToProfile(name string) error {
 	return nil
 }
 
+// SwitchTo writes a profile into the active Codex auth location.
+// If a later write fails after auth.json is replaced, it attempts to restore the previous state.
 func (s Store) SwitchTo(name string) error {
 	if err := ValidateAccountName(name); err != nil {
 		return err
@@ -83,6 +87,7 @@ func (s Store) SwitchTo(name string) error {
 	return nil
 }
 
+// readSwitchState snapshots active files before SwitchTo starts mutating them.
 func (s Store) readSwitchState() (switchState, error) {
 	files, err := s.readCurrentAuthFiles()
 	if err != nil {
@@ -118,6 +123,7 @@ func (s Store) readCurrentAuthFiles() (map[string][]byte, error) {
 	return files, nil
 }
 
+// restoreAfterFailedSwitch reports the original failure and whether rollback succeeded.
 func (s Store) restoreAfterFailedSwitch(state switchState, cause error) error {
 	if restoreErr := s.writeSwitchState(state); restoreErr != nil {
 		return fmt.Errorf("switch failed: %v; restore previous auth failed: %w", cause, restoreErr)
@@ -125,6 +131,7 @@ func (s Store) restoreAfterFailedSwitch(state switchState, cause error) error {
 	return fmt.Errorf("switch failed: %v; restored previous auth", cause)
 }
 
+// writeSwitchState restores auth files and the current hint from a snapshot.
 func (s Store) writeSwitchState(state switchState) error {
 	if err := s.writeCurrentAuthFiles(state.authFiles); err != nil {
 		return err
@@ -141,6 +148,7 @@ func (s Store) writeSwitchState(state switchState) error {
 	return nil
 }
 
+// writeCurrentAuthFiles mirrors a snapshot into CODEX_HOME, removing tracked files absent from it.
 func (s Store) writeCurrentAuthFiles(files map[string][]byte) error {
 	if data, ok := files[authFileName]; ok {
 		if err := WriteFileAtomic(s.codexAuthPath(), data, 0o600); err != nil {
@@ -164,6 +172,7 @@ func (s Store) writeCurrentAuthFiles(files map[string][]byte) error {
 	return nil
 }
 
+// backupCurrentAuth keeps a timestamped copy of auth.json before destructive writes.
 func (s Store) backupCurrentAuth() error {
 	data, err := os.ReadFile(s.codexAuthPath())
 	if err != nil {
@@ -179,6 +188,7 @@ func (s Store) backupCurrentAuth() error {
 	return WriteFileAtomic(filepath.Join(s.Root, "backups", name), data, 0o600)
 }
 
+// saveAuthSidecarFiles stores optional auth-adjacent files with the profile.
 func (s Store) saveAuthSidecarFiles(profileDir string) error {
 	for _, file := range authSidecarFiles {
 		data, err := os.ReadFile(filepath.Join(s.CodexHome, file))

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 )
 
+// WriteJSONAtomic writes indented JSON through a same-directory temporary file.
 func WriteJSONAtomic(path string, value any, perm os.FileMode) error {
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
@@ -15,6 +16,8 @@ func WriteJSONAtomic(path string, value any, perm os.FileMode) error {
 	return WriteFileAtomic(path, data, perm)
 }
 
+// WriteFileAtomic writes data with final permissions, then renames it into place.
+// The temp file lives in the target directory so os.Rename remains atomic.
 func WriteFileAtomic(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {

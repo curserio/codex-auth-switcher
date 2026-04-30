@@ -2,6 +2,7 @@ package usage
 
 import "time"
 
+// Normalize converts a raw Codex rate-limit snapshot into the persisted Record shape.
 func Normalize(snapshot Snapshot, source string, capturedAt time.Time) Record {
 	record := Record{CapturedAt: capturedAt, Source: source}
 	if snapshot.PlanType != nil {
@@ -18,6 +19,7 @@ func Normalize(snapshot Snapshot, source string, capturedAt time.Time) Record {
 
 func normalizeWindow(window LimitWindow) Window {
 	used := window.UsedPercent
+	// Some sources emit zero as the absent value for one casing while the other casing is set.
 	if used == 0 && window.UsedPercentCamel != 0 {
 		used = window.UsedPercentCamel
 	}

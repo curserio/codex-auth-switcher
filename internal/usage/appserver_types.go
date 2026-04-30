@@ -1,5 +1,6 @@
 package usage
 
+// Snapshot mirrors the rate-limit payload shape used by Codex app-server.
 type Snapshot struct {
 	LimitID              *string      `json:"limit_id,omitempty"`
 	LimitName            *string      `json:"limit_name,omitempty"`
@@ -20,6 +21,7 @@ type camelSnapshot struct {
 	RateLimitReachedType *string      `json:"rateLimitReachedType,omitempty"`
 }
 
+// LimitWindow accepts both snake_case and camelCase fields seen across Codex surfaces.
 type LimitWindow struct {
 	UsedPercent        int    `json:"used_percent,omitempty"`
 	UsedPercentCamel   int    `json:"usedPercent,omitempty"`
