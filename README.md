@@ -156,12 +156,3 @@ The profile store can contain usable local auth material. Do not publish,
 share, or attach profile directories, `auth.json`, Codex session logs, or
 terminal output containing tokens. Use `codex-switch doctor` to inspect local
 state without printing raw auth data.
-
-## Maintainer Notes
-
-Recommended GitHub settings:
-
-- Repository topics: `codex`, `openai`, `cli`, `go`, `auth`, `developer-tools`
-- Enable secret scanning
-- Protect the default branch
-- Create the first release tag as `v0.1.0`
